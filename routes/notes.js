@@ -2,36 +2,28 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
-const { MONGODB_URI } = require('../config');
 const Note = require('../models/note');
 const router = express.Router();
 
 /* ========== GET/READ ALL ITEMS ========== */
 router.get('/', (req, res, next) => {
   console.log('Get All Notes');
+  const { searchTerm } = req.query;
 
-  // const searchTerm = 'cats';
-  // let filter = {};
+  let filter = {};
 
-  // if (searchTerm) {
-  //   filter.title = { $regex: searchTerm };
-  //   filter.content = { $regex: searchTerm };
-  // }
+  if (searchTerm) {
+    const regex = new RegExp(searchTerm, 'i');
+    filter.$or = [{ title: regex }, { content: regex }];
+  }
 
-  // return Note.find({
-  //   $or: [{ title: filter.title }, { content: filter.content }]
-  // });
-  Note.find()
+  Note.find(filter)
+    .sort({ updatedAt: 'desc' })
     .then(results => {
-      console.log(results);
       res.json(results);
     })
-    .then(() => {
-      return mongoose.disconnect();
-    })
     .catch(err => {
-      console.error(`ERROR: ${err.message}`);
-      console.error(err);
+      next(err);
     });
 });
 
@@ -40,7 +32,11 @@ router.get('/:id', (req, res, next) => {
   console.log('Get a Note');
   const { id } = req.params;
 
-  // if ()
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    const err = new Error('The id is not valid');
+    err.status = 400;
+    return next(err);
+  }
 
   Note.findById(id)
     .then(note => {
@@ -102,6 +98,12 @@ router.put('/:id', (req, res, next) => {
   const updateItem = {};
 
   /***** Never trust users. Validate input *****/
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    const err = new Error('The id is not valid');
+    err.status = 400;
+    return next(err);
+  }
+
   if (!title) {
     const err = new Error('Missing `title` in request body');
     err.status = 400;
@@ -114,10 +116,7 @@ router.put('/:id', (req, res, next) => {
     updateItem.content = content;
   }
 
-  Note.findByIdAndUpdate(id, updateItem)
-    .then(() => {
-      return Note.findById(id);
-    })
+  Note.findByIdAndUpdate(id, updateItem, { new: true })
     .then(note => {
       console.log('Note updated');
       res.json({ id: note.id, title: note.title });
