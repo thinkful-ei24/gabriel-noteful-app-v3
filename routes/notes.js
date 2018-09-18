@@ -9,25 +9,19 @@ const router = express.Router();
 /* ========== GET/READ ALL ITEMS ========== */
 router.get('/', (req, res, next) => {
   console.log('Get All Notes');
-  mongoose
-    .connect(
-      MONGODB_URI,
-      { useNewUrlParser: true }
-    )
-    .then(() => {
-      // const searchTerm = 'cats';
-      // let filter = {};
 
-      // if (searchTerm) {
-      //   filter.title = { $regex: searchTerm };
-      //   filter.content = { $regex: searchTerm };
-      // }
+  // const searchTerm = 'cats';
+  // let filter = {};
 
-      // return Note.find({
-      //   $or: [{ title: filter.title }, { content: filter.content }]
-      // });
-      return Note.find();
-    })
+  // if (searchTerm) {
+  //   filter.title = { $regex: searchTerm };
+  //   filter.content = { $regex: searchTerm };
+  // }
+
+  // return Note.find({
+  //   $or: [{ title: filter.title }, { content: filter.content }]
+  // });
+  Note.find()
     .then(results => {
       console.log(results);
       res.json(results);
@@ -46,14 +40,9 @@ router.get('/:id', (req, res, next) => {
   console.log('Get a Note');
   const { id } = req.params;
 
-  mongoose
-    .connect(
-      MONGODB_URI,
-      { useNewUrlParser: true }
-    )
-    .then(() => {
-      return Note.findById(id);
-    })
+  // if ()
+
+  Note.findById(id)
     .then(note => {
       console.log(note);
       res.json(note);
@@ -86,14 +75,7 @@ router.post('/', (req, res, next) => {
     newNote.content = content;
   }
 
-  mongoose
-    .connect(
-      MONGODB_URI,
-      { useNewUrlParser: true }
-    )
-    .then(() => {
-      return Note.create(newNote);
-    })
+  Note.create(newNote)
     .then(note => {
       console.log('New note created');
       console.log(note);
@@ -132,14 +114,7 @@ router.put('/:id', (req, res, next) => {
     updateItem.content = content;
   }
 
-  mongoose
-    .connect(
-      MONGODB_URI,
-      { useNewUrlParser: true }
-    )
-    .then(() => {
-      return Note.findByIdAndUpdate(id, updateItem);
-    })
+  Note.findByIdAndUpdate(id, updateItem)
     .then(() => {
       return Note.findById(id);
     })
@@ -162,14 +137,7 @@ router.delete('/:id', (req, res, next) => {
   console.log('Delete a Note');
   const { id } = req.params;
 
-  mongoose
-    .connect(
-      MONGODB_URI,
-      { useNewUrlParser: true }
-    )
-    .then(() => {
-      return Note.findByIdAndRemove(id);
-    })
+  Note.findByIdAndRemove(id)
     .then(() => {
       console.log('Note removed');
       res.status(204).end();
