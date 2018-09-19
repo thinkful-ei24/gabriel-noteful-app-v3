@@ -151,7 +151,6 @@ describe('Test each of the endpoints', () => {
       };
 
       let res;
-      // 1) First, call the API
       return chai
         .request(app)
         .post('/api/notes')
@@ -161,6 +160,52 @@ describe('Test each of the endpoints', () => {
           expect(res).to.have.status(400);
           expect(res).to.be.json;
           expect(res.body).to.be.a('object');
+          expect(res.body).to.have.keys('status', 'message');
+        });
+    });
+  });
+
+  describe('PUT request testing', function() {
+    /* Postive */
+    it('Successfully updates an item in the database', function() {
+      const updateItem = { title: 'blargh', content: 'blarghblargh' };
+      return Note.findOne()
+        .then(data => {
+          return chai
+            .request(app)
+            .put(`/api/notes/${data.id}`)
+            .send(updateItem);
+        })
+        .then(res => {
+          expect(res).to.have.status(200);
+          expect(res).to.be.json;
+          expect(res.body).to.be.an('object');
+          expect(res.body).to.have.keys('id', 'title');
+          return res.body.id;
+        })
+        .then(id => {
+          console.log(`ID IS ${id}`);
+          return chai.request(app).get(`/api/notes/${id}`);
+        })
+        .then(res => {
+          expect(res.body.title).to.equal(updateItem.title);
+          expect(res.body.content).to.equal(updateItem.content);
+        });
+    });
+    /* Negative */
+    it('Fails to updates an item in the database when missing title', function() {
+      const updateItem = { content: 'blarghblargh' };
+      return Note.findOne()
+        .then(data => {
+          return chai
+            .request(app)
+            .put(`/api/notes/${data.id}`)
+            .send(updateItem);
+        })
+        .then(res => {
+          expect(res).to.have.status(400);
+          expect(res).to.be.json;
+          expect(res.body).to.be.an('object');
           expect(res.body).to.have.keys('status', 'message');
         });
     });
