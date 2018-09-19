@@ -78,7 +78,7 @@ router.post('/', (req, res, next) => {
       res
         .location(`${req.originalUrl}/${note.id}`)
         .status(201)
-        .json({ id: note.id, title: note.title });
+        .json(note);
     })
     .then(() => {
       return mongoose.disconnect();
