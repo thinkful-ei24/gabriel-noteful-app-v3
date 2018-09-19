@@ -43,9 +43,6 @@ router.get('/:id', (req, res, next) => {
       console.log(note);
       res.json(note);
     })
-    .then(() => {
-      return mongoose.disconnect();
-    })
     .catch(err => {
       console.error(`ERROR: ${err.message}`);
       console.error(err);
@@ -79,9 +76,6 @@ router.post('/', (req, res, next) => {
         .location(`${req.originalUrl}/${note.id}`)
         .status(201)
         .json(note);
-    })
-    .then(() => {
-      return mongoose.disconnect();
     })
     .catch(err => {
       console.log('Error creating note');
@@ -121,9 +115,7 @@ router.put('/:id', (req, res, next) => {
       console.log('Note updated');
       res.json({ id: note.id, title: note.title });
     })
-    .then(() => {
-      return mongoose.disconnect();
-    })
+
     .catch(err => {
       console.log('Error updating note');
       console.error(err);
@@ -141,9 +133,7 @@ router.delete('/:id', (req, res, next) => {
       console.log('Note removed');
       res.status(204).end();
     })
-    .then(() => {
-      return mongoose.disconnect();
-    })
+
     .catch(err => {
       console.error(err);
       console.log(err);

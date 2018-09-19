@@ -31,64 +31,138 @@ describe('Test each of the endpoints', () => {
     return mongoose.disconnect();
   });
 
-  // GET
-  it('GET /api/notes', function() {
-    // 1) Call the database **and** the API
-    // 2) Wait for both promises to resolve using `Promise.all`
-    return (
-      Promise.all([Note.find(), chai.request(app).get('/api/notes')])
-        // 3) then compare database results to API response
-        .then(([data, res]) => {
+  describe('GET request testing', function() {
+    /* Positve */
+    it('GET /api/notes should be an array', function() {
+      // 1) Call the database **and** the API
+      // 2) Wait for both promises to resolve using `Promise.all`
+      return (
+        Promise.all([Note.find(), chai.request(app).get('/api/notes')])
+          // 3) then compare database results to API response
+          .then(([data, res]) => {
+            expect(res).to.have.status(200);
+            expect(res).to.be.json;
+            expect(res.body).to.be.a('array');
+            expect(res.body).to.have.length(data.length);
+          })
+      );
+    });
+
+    it('Should return correct note for an ID', function() {
+      let data;
+      return Note.findOne()
+        .then(_data => {
+          data = _data;
+          return chai.request(app).get(`/api/notes/${data.id}`);
+        })
+        .then(res => {
           expect(res).to.have.status(200);
           expect(res).to.be.json;
-          expect(res.body).to.be.a('array');
-          expect(res.body).to.have.length(data.length);
-        })
-    );
+          expect(res.body).to.be.an('object');
+          expect(res.body).to.have.keys(
+            'id',
+            'title',
+            'content',
+            'createdAt',
+            'updatedAt'
+          );
+          expect(res.body.id).to.be.equal(data.id);
+          expect(res.body.title).to.equal(data.title);
+          expect(res.body.content).to.equal(data.content);
+        });
+    });
+
+    /* Negative */
+    it('Should return an empty array for an incorrect query', function() {
+      const searchTerm = 'Nasdklajfawiopfawfkj';
+      const re = new RegExp(searchTerm, 'i');
+      const dbPromise = Note.find({ title: { $regex: re } });
+      const apiPromise = chai
+        .request(app)
+        .get(`/api/notes?searchTerm=${searchTerm}`);
+
+      return Promise.all([dbPromise, apiPromise]).then(([data, res]) => {
+        expect(res).to.have.status(200);
+        expect(res).to.be.json;
+        expect(res.body).to.be.a('array');
+        expect(res.body).to.have.length(data.length);
+      });
+    });
+
+    it('Should respond with a 400 error if wrong ID given', function() {
+      return chai
+        .request(app)
+        .get('/api/notes/1245121')
+        .then(res => {
+          expect(res).to.have.status(400);
+          expect(res).to.be.json;
+          expect(res.body).to.be.an('object');
+          expect(res.body.status).to.equal(400);
+        });
+    });
   });
 
-  // it('should create and return a new item when provided valid data', function() {
-  //   const newItem = {
-  //     title: 'The best article about cats ever!',
-  //     content:
-  //       'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor...'
-  //   };
+  describe('POST request testing', function() {
+    it('should create and return a new item when provided valid data', function() {
+      const newItem = {
+        title: 'The best article about cats ever!',
+        content:
+          'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor...'
+      };
 
-  //   let res;
-  //   // 1) First, call the API
-  //   return (
-  //     chai
-  //       .request(app)
-  //       .post('/api/notes')
-  //       .send(newItem)
-  //       .then(function(_res) {
-  //         res = _res;
-  //         expect(res).to.have.status(201);
-  //         expect(res).to.have.header('location');
-  //         expect(res).to.be.json;
-  //         expect(res.body).to.be.a('object');
-  //         expect(res.body).to.have.keys(
-  //           'id',
-  //           'title',
-  //           'content',
-  //           'createdAt',
-  //           'updatedAt'
-  //         );
-  //         // 2) then call the database
-  //         return Note.findById(res.body.id);
-  //       })
-  //       // 3) then compare the API response to the database results
-  //       .then(data => {
-  //         console.log('this is data');
-  //         console.log(data);
-  //         expect(res.body.id).to.equal(data.id);
-  //         expect(res.body.title).to.equal(data.title);
-  //         expect(res.body.content).to.equal(data.content);
-  //         expect(new Date(res.body.createdAt)).to.eql(data.createdAt);
-  //         expect(new Date(res.body.updatedAt)).to.eql(data.updatedAt);
-  //       })
-  //   );
-  // });
+      let res;
+      // 1) First, call the API
+      return (
+        chai
+          .request(app)
+          .post('/api/notes')
+          .send(newItem)
+          .then(function(_res) {
+            res = _res;
+            expect(res).to.have.status(201);
+            expect(res).to.have.header('location');
+            expect(res).to.be.json;
+            expect(res.body).to.be.a('object');
+            expect(res.body).to.have.keys(
+              'id',
+              'title',
+              'content',
+              'createdAt',
+              'updatedAt'
+            );
+            // 2) then call the database
+            return Note.findById(res.body.id);
+          })
+          // 3) then compare the API response to the database results
+          .then(data => {
+            expect(res.body.id).to.equal(data.id);
+            expect(res.body.title).to.equal(data.title);
+            expect(res.body.content).to.equal(data.content);
+            expect(new Date(res.body.createdAt)).to.eql(data.createdAt);
+            expect(new Date(res.body.updatedAt)).to.eql(data.updatedAt);
+          })
+      );
+    });
 
-  // GET by ID
+    it('Returns an error when we are missing the title field', function() {
+      const newItem = {
+        content:
+          'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor...'
+      };
+
+      let res;
+      // 1) First, call the API
+      return chai
+        .request(app)
+        .post('/api/notes')
+        .send(newItem)
+        .then(function(_res) {
+          res = _res;
+          expect(res).to.have.status(400);
+          expect(res).to.be.json;
+          expect(res.body).to.be.a('object');
+          expect(res.body).to.have.keys('status', 'message');
+        });
+    });
+  });
 });
