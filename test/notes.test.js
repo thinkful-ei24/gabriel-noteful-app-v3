@@ -210,4 +210,39 @@ describe('Test each of the endpoints', () => {
         });
     });
   });
+
+  describe('DELETE request testing', function() {
+    it('Successfully deletes item from DB', function() {
+      let id;
+      return Note.findOne()
+        .then(data => {
+          id = data.id;
+          return chai.request(app).delete(`/api/notes/${data.id}`);
+        })
+        .then(res => {
+          expect(res).to.have.status(204);
+        })
+        .then(() => {
+          return chai.request(app).get(`/api/notes/${id}`);
+        })
+        .then(res => {
+          expect(res).to.have.status(200);
+        });
+    });
+
+    it('Fails to delete item when ID is invalid', function() {
+      return chai
+        .request(app)
+        .delete('/api/notes/124542632')
+        .then(res => {
+          expect(res).to.have.status(500);
+        })
+        .then(() => {
+          return chai.request(app).get('/api/notes/124542632');
+        })
+        .then(res => {
+          expect(res).to.have.status(400);
+        });
+    });
+  });
 });
