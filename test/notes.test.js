@@ -7,7 +7,7 @@ const { TEST_MONGODB_URI } = require('../config');
 
 const Note = require('../models/note');
 
-const { notes } = require('../db/seed/notes.js');
+const { notes, folders } = require('../db/seed/data.js');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
@@ -64,7 +64,8 @@ describe('Test each of the endpoints', () => {
             'title',
             'content',
             'createdAt',
-            'updatedAt'
+            'updatedAt',
+            'folderId'
           );
           expect(res.body.id).to.be.equal(data.id);
           expect(res.body.title).to.equal(data.title);

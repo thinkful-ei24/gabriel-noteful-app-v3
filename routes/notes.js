@@ -8,17 +8,21 @@ const router = express.Router();
 /* ========== GET/READ ALL ITEMS ========== */
 router.get('/', (req, res, next) => {
   console.log('Get All Notes');
-  const { searchTerm } = req.query;
+  const { searchTerm, folderId } = req.query;
 
   let filter = {};
 
   if (searchTerm) {
-    const regex = new RegExp(searchTerm, 'i');
-    filter.$or = [{ title: regex }, { content: regex }];
+    const re = new RegExp(searchTerm, 'i');
+    filter.title = { $regex: re };
+  }
+
+  if (folderId) {
+    filter.folderId = folderId;
   }
 
   Note.find(filter)
-    .sort({ updatedAt: 'desc' })
+    .sort('created')
     .then(results => {
       res.json(results);
     })
@@ -53,7 +57,7 @@ router.get('/:id', (req, res, next) => {
 /* ========== POST/CREATE AN ITEM ========== */
 router.post('/', (req, res, next) => {
   console.log('Create a Note');
-  const { title, content } = req.body;
+  const { title, content, folderId } = req.body;
 
   const newNote = {};
 
@@ -66,6 +70,16 @@ router.post('/', (req, res, next) => {
   }
   if (content) {
     newNote.content = content;
+  }
+
+  if (folderId) {
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+      const err = new Error('The folderId is not valid');
+      err.status = 400;
+      return next(err);
+    } else {
+      newNote.folderId = folderId;
+    }
   }
 
   Note.create(newNote)
@@ -88,7 +102,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   console.log('Update a Note');
   const { id } = req.params;
-  const { title, content } = req.body;
+  const { title, content, folderId } = req.body;
   const updateItem = {};
 
   /***** Never trust users. Validate input *****/
@@ -108,6 +122,16 @@ router.put('/:id', (req, res, next) => {
 
   if (content) {
     updateItem.content = content;
+  }
+
+  if (folderId) {
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+      const err = new Error('The folderId is not valid');
+      err.status = 400;
+      return next(err);
+    } else {
+      updateItem.folderId = folderId;
+    }
   }
 
   Note.findByIdAndUpdate(id, updateItem, { new: true })
