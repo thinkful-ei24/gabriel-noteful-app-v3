@@ -15,7 +15,7 @@ router.get('/', (req, res, next) => {
 
   if (searchTerm) {
     const re = new RegExp(searchTerm, 'i');
-    filter.title = { $regex: re };
+    filter.$or = [{ title: { $regex: re } }, { content: { $regex: re } }];
   }
 
   // if querying by folder, then add to filter
@@ -138,7 +138,7 @@ router.put('/:id', (req, res, next) => {
   Note.findByIdAndUpdate(id, updateItem, { new: true })
     .then(note => {
       console.log('Note updated');
-      res.json({ id: note.id, title: note.title });
+      res.json({ id: note.id, title: note.title, content: note.content });
     })
 
     .catch(err => {
