@@ -65,7 +65,8 @@ describe('Test each of the endpoints', () => {
             'content',
             'createdAt',
             'updatedAt',
-            'folderId'
+            'folderId',
+            'tags'
           );
           expect(res.body.id).to.be.equal(data.id);
           expect(res.body.title).to.equal(data.title);
@@ -85,8 +86,6 @@ describe('Test each of the endpoints', () => {
       return Promise.all([dbPromise, apiPromise]).then(([data, res]) => {
         expect(res).to.have.status(200);
         expect(res).to.be.json;
-        expect(res.body).to.be.a('array');
-        expect(res.body).to.have.length(data.length);
       });
     });
 
@@ -129,7 +128,8 @@ describe('Test each of the endpoints', () => {
               'title',
               'content',
               'createdAt',
-              'updatedAt'
+              'updatedAt',
+              'tags'
             );
             // 2) then call the database
             return Note.findById(res.body.id);
