@@ -181,7 +181,7 @@ describe('Test each of the endpoints', () => {
           expect(res).to.have.status(200);
           expect(res).to.be.json;
           expect(res.body).to.be.an('object');
-          expect(res.body).to.have.keys('id', 'title');
+          expect(res.body).to.have.keys('id', 'title', 'content');
           return res.body.id;
         })
         .then(id => {
