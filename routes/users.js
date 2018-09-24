@@ -33,14 +33,6 @@ router.post('/', (req, res, next) => {
   );
 
   if (nonTrimmedField) {
-    const err = new Error(
-      `Field: '${nonTrimmedField}' cannot start or end with whitespace`
-    );
-    err.status = 422;
-    return next(err);
-  }
-
-  if (nonTrimmedField) {
     const err = new Error('Values may not contain leading/trailing whitespace');
     err.status = 422;
     return next(err);
