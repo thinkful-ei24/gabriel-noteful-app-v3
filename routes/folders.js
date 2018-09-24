@@ -35,8 +35,8 @@ router.get('/:id', (req, res, next) => {
       res.json(folder);
     })
     .catch(err => {
-      console.error(`ERROR: ${err.message}`);
-      console.error(err);
+      // console.error(`ERROR: ${err.message}`);
+      // console.error(err);
       next(err);
     });
 });
@@ -55,7 +55,7 @@ router.post('/', (req, res, next) => {
   Folder.create({ name })
     .then(folder => {
       console.log('New folder created');
-      console.log(folder);
+      // console.log(folder);
       res
         .location(`${req.originalUrl}/${folder.id}`)
         .status(201)

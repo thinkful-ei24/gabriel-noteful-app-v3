@@ -114,7 +114,7 @@ describe('Test each of the endpoints', () => {
         });
     });
     // Negative
-    it('Should create a new folder', function() {
+    it('Should fail to create a new folder', function() {
       const newFolder = {};
       let res;
       return chai
@@ -152,6 +152,7 @@ describe('Test each of the endpoints', () => {
           expect(res.body.name).to.equal(updateFolder.name);
         });
     });
+
     // Negative
     it('Should respond with 400 for bad ID', function() {
       const updateItem = {

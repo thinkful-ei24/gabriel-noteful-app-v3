@@ -56,8 +56,8 @@ router.get('/:id', (req, res, next) => {
       res.json(note);
     })
     .catch(err => {
-      console.error(`ERROR: ${err.message}`);
-      console.error(err);
+      // console.error(`ERROR: ${err.message}`);
+      // console.error(err);
       next(err);
     });
 });
@@ -160,8 +160,8 @@ router.delete('/:id', (req, res, next) => {
     })
 
     .catch(err => {
-      console.error(err);
-      console.log(err);
+      // console.error(err);
+      // console.log(err);
       next(err);
     });
 });
