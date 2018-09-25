@@ -2,6 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/user');
 const router = express.Router();
+const passport = require('passport');
+
+router.use(
+  '/',
+  passport.authenticate('jwt', { session: false, failWithError: true })
+);
 
 router.post('/', (req, res, next) => {
   const { fullname = '', username, password } = req.body;
