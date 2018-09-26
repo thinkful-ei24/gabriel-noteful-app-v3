@@ -3,7 +3,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Note = require('../models/note');
-const Folder = require('../models/folders');
 const Tag = require('../models/tags');
 const router = express.Router();
 const passport = require('passport');
@@ -16,8 +15,9 @@ router.use(
 /* GET ALL */
 router.get('/', (req, res, next) => {
   console.log('Get all tags');
+  const userId = req.user.id;
 
-  Tag.find()
+  Tag.find({ userId })
     .sort({ name: 'asc' })
     .then(results => {
       res.json(results);
@@ -29,6 +29,7 @@ router.get('/', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
   console.log('Get tag by ID');
   const { id } = req.params;
+  const userId = req.user.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The id is not valid');
@@ -36,7 +37,7 @@ router.get('/:id', (req, res, next) => {
     return next(err);
   }
 
-  Tag.findById(id)
+  Tag.findOne({ _id: id, userId })
     .then(tag => {
       console.log(tag);
       res.json(tag);
@@ -52,14 +53,19 @@ router.get('/:id', (req, res, next) => {
 router.post('/', (req, res, next) => {
   console.log('Create new tag');
   const { name } = req.body;
+  const userId = req.user.id;
+
+  const newTag = { userId };
 
   if (!name) {
     const err = new Error('Missing name in request body');
     err.status = 400;
     return next(err);
+  } else {
+    newTag.name = name;
   }
 
-  Tag.create({ name })
+  Tag.create(newTag)
     .then(tag => {
       console.log('New tag created');
       console.log(tag);
@@ -82,6 +88,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   const { name } = req.body;
   const { id } = req.params;
+  const userId = req.user.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The id is not valid');
@@ -95,7 +102,7 @@ router.put('/:id', (req, res, next) => {
     return next(err);
   }
 
-  const updateItem = { name };
+  const updateItem = { name, userId };
 
   Tag.findByIdAndUpdate(id, updateItem, { new: true })
     .then(tag => {
@@ -115,8 +122,9 @@ router.put('/:id', (req, res, next) => {
 /* DELETE by ID */
 router.delete('/:id', (req, res, next) => {
   const { id } = req.params;
-  const tagRemovePromise = Tag.findByIdAndRemove(id);
+  const userId = req.user.id;
 
+  const tagRemovePromise = Tag.findByIdAndRemove({ _id: id, userId });
   const noteUpdatePromise = Note.updateMany(
     { tags: id },
     { $pull: { tags: id } }

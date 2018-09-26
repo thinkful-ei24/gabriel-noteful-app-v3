@@ -4,8 +4,9 @@ const { MONGODB_URI } = require('../config');
 const Note = require('../models/note');
 const Folder = require('../models/folders');
 const Tag = require('../models/tags');
+const User = require('../models/user');
 
-const { notes, folders, tags } = require('../db/seed/data');
+const { notes, folders, tags, users } = require('../db/seed/data');
 
 mongoose
   .connect(
@@ -18,6 +19,8 @@ mongoose
       Note.insertMany(notes),
       Folder.insertMany(folders),
       Tag.insertMany(tags),
+      User.insertMany(users),
+      User.createIndexes(),
       Folder.createIndexes(),
       Tag.createIndexes()
     ]);

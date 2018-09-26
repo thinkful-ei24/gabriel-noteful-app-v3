@@ -15,8 +15,9 @@ router.use(
 /* GET ALL */
 router.get('/', (req, res, next) => {
   console.log('Get all folders');
+  const userId = req.user.id;
 
-  Folder.find()
+  Folder.find({ userId })
     .sort({ name: 'asc' })
     .then(results => {
       res.json(results);
@@ -28,6 +29,7 @@ router.get('/', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
   console.log('Get folder by ID');
   const { id } = req.params;
+  const userId = req.user.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The id is not valid');
@@ -35,14 +37,12 @@ router.get('/:id', (req, res, next) => {
     return next(err);
   }
 
-  Folder.findById(id)
+  Folder.findOne({ _id: id, userId })
     .then(folder => {
       console.log(folder);
       res.json(folder);
     })
     .catch(err => {
-      // console.error(`ERROR: ${err.message}`);
-      // console.error(err);
       next(err);
     });
 });
@@ -51,6 +51,7 @@ router.get('/:id', (req, res, next) => {
 router.post('/', (req, res, next) => {
   console.log('Create new folder');
   const { name } = req.body;
+  const userId = req.user.id;
 
   if (!name) {
     const err = new Error('Missing name in request body');
@@ -58,7 +59,9 @@ router.post('/', (req, res, next) => {
     return next(err);
   }
 
-  Folder.create({ name })
+  const newFolder = { name, userId };
+
+  Folder.create(newFolder)
     .then(folder => {
       console.log('New folder created');
       // console.log(folder);
@@ -81,6 +84,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   const { name } = req.body;
   const { id } = req.params;
+  const userId = req.user.id;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     const err = new Error('The id is not valid');
@@ -94,9 +98,9 @@ router.put('/:id', (req, res, next) => {
     return next(err);
   }
 
-  const updateItem = { name };
+  const updateFolder = { name, userId };
 
-  Folder.findByIdAndUpdate(id, updateItem, { new: true })
+  Folder.findByIdAndUpdate(id, updateFolder, { new: true })
     .then(note => {
       console.log('Folder updated');
       res.json(note);
@@ -114,8 +118,9 @@ router.put('/:id', (req, res, next) => {
 /* DELETE by ID */
 router.delete('/:id', (req, res, next) => {
   const { id } = req.params;
+  const userId = req.user.id;
 
-  const folderRemovePromise = Folder.findByIdAndRemove({ _id: id });
+  const folderRemovePromise = Folder.findByIdAndRemove({ _id: id, userId });
   const noteRemovePromise = Note.updateMany(
     { folderId: id },
     { $unset: { folderId: '' } }
