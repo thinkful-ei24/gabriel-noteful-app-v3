@@ -3,12 +3,14 @@ const chaiHttp = require('chai-http');
 const mongoose = require('mongoose');
 
 const app = require('../server');
-const { TEST_MONGODB_URI } = require('../config');
+const { TEST_MONGODB_URI, JWT_SECRET } = require('../config');
+const jwt = require('jsonwebtoken');
 
-const Note = require('../models/note');
+const Folder = require('../models/folders');
 const Tag = require('../models/tags');
+const User = require('../models/user');
 
-const { notes, folders, tags } = require('../db/seed/data.js');
+const { notes, folders, tags, users } = require('../db/seed/data.js');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
@@ -20,8 +22,19 @@ describe('Test each of the tag endpoints', () => {
       .then(() => mongoose.connection.db.dropDatabase());
   });
 
+  let token;
+  let user;
+
   beforeEach(function() {
-    return Tag.insertMany(tags);
+    return Promise.all([
+      User.insertMany(users),
+      Folder.insertMany(folders),
+      Tag.insertMany(tags),
+      Folder.createIndexes()
+    ]).then(([users]) => {
+      user = users[0];
+      token = jwt.sign({ user }, JWT_SECRET, { subject: user.username });
+    });
   });
 
   afterEach(function() {
@@ -36,7 +49,13 @@ describe('Test each of the tag endpoints', () => {
     /* Positive */
     it('should return all tags', function() {
       return (
-        Promise.all([Tag.find(), chai.request(app).get('/api/tags')])
+        Promise.all([
+          Tag.find({ userId: user.id }),
+          chai
+            .request(app)
+            .get('/api/tags')
+            .set('Authorization', `Bearer ${token}`)
+        ])
           // 3) then compare database results to API response
           .then(([data, res]) => {
             expect(res).to.have.status(200);
@@ -52,13 +71,22 @@ describe('Test each of the tag endpoints', () => {
       return Tag.findOne()
         .then(_data => {
           data = _data;
-          return chai.request(app).get(`/api/tags/${data.id}`);
+          return chai
+            .request(app)
+            .get(`/api/tags/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res).to.have.status(200);
           expect(res).to.be.json;
           expect(res.body).to.be.an('object');
-          expect(res.body).to.have.keys('name', 'createdAt', 'id', 'updatedAt');
+          expect(res.body).to.have.keys(
+            'name',
+            'createdAt',
+            'id',
+            'updatedAt',
+            'userId'
+          );
           expect(res.body.id).to.be.equal(data.id);
           expect(res.body.title).to.equal(data.title);
           expect(res.body.content).to.equal(data.content);
@@ -70,6 +98,7 @@ describe('Test each of the tag endpoints', () => {
       return chai
         .request(app)
         .get('/api/tags/1245121')
+        .set('Authorization', `Bearer ${token}`)
         .then(res => {
           expect(res).to.have.status(400);
           expect(res).to.be.json;
@@ -87,6 +116,7 @@ describe('Test each of the tag endpoints', () => {
       return chai
         .request(app)
         .post('/api/tags')
+        .set('Authorization', `Bearer ${token}`)
         .send(newFolder)
         .then(res => {
           expect(res).to.have.status(201);
@@ -103,6 +133,7 @@ describe('Test each of the tag endpoints', () => {
       return chai
         .request(app)
         .post('/api/tags')
+        .set('Authorization', `Bearer ${token}`)
         .send({})
         .then(res => {
           expect(res.body).to.have.status(400);
@@ -112,84 +143,68 @@ describe('Test each of the tag endpoints', () => {
   });
 
   describe('PUT request testing', function() {
-    it('should update a note based on id', function() {
-      /* POSITIVE */
-      it('should update a tag in the database', function() {
-        const updateTag = { name: 'hurp' };
+    /* POSITIVE */
+    it('should update the tag', function() {
+      const updateItem = { name: 'Updated Name' };
+      let data;
+      return Tag.findOne({ userId: user.id })
+        .then(_data => {
+          data = _data;
+          return chai
+            .request(app)
+            .put(`/api/tags/${data.id}`)
+            .set('Authorization', `Bearer ${token}`)
+            .send(updateItem);
+        })
+        .then(function(res) {
+          expect(res).to.have.status(200);
+          expect(res).to.be.json;
+          expect(res.body).to.be.a('object');
+          expect(res.body).to.include.keys('id', 'name');
+          expect(res.body.id).to.equal(data.id);
+          expect(res.body.name).to.equal(updateItem.name);
+        });
+    });
 
-        return Tag.findOne()
-          .then(data => {
-            return chai
-              .request(app)
-              .put(`/api/notes/${data.id}`)
-              .send(updateTag);
-          })
-          .then(res => {
-            expect(res).to.have.status(200);
-            expect(res).to.be.json;
-            expect(res.body).to.be.an('object');
-            expect(res.body).to.have.keys('id', 'title');
-            return res.body.id;
-          })
-          .then(id => {
-            return chai.request(app.get(`/api/notes/${id}`));
-          })
-          .then(res => {
-            expect(res.body.name).to.equal(updateTag.name);
-          });
-      });
-      /* NEGATIVE */
-      it('Fails to updates a tag in the database when missing title', function() {
-        const updateItem = { content: 'blarghblargh' };
-        return Tag.findOne()
-          .then(data => {
-            return chai
-              .request(app)
-              .put(`/api/tags/${data.id}`)
-              .send(updateItem);
-          })
-          .then(res => {
-            expect(res).to.have.status(400);
-            expect(res).to.be.json;
-            expect(res.body).to.be.an('object');
-            expect(res.body).to.have.keys('status', 'message');
-          });
-      });
+    /* NEGATIVE */
+    it('Fails to updates a tag in the database when missing title', function() {
+      const updateItem = { content: 'blarghblargh' };
+      return Tag.findOne()
+        .then(data => {
+          return chai
+            .request(app)
+            .put(`/api/tags/${data.id}`)
+            .set('Authorization', `Bearer ${token}`)
+            .send(updateItem);
+        })
+        .then(res => {
+          expect(res).to.have.status(400);
+          expect(res).to.be.json;
+          expect(res.body).to.be.an('object');
+          expect(res.body).to.have.keys('status', 'message');
+        });
     });
   });
 
   describe('DELETE request testing', function() {
     /* POSITIVE */
-    it('Successfully deletes tag from DB', function() {
-      let id;
-      return Tag.findOne()
-        .then(data => {
-          id = data.id;
-          return chai.request(app).delete(`/api/notes/${data.id}`);
+    it('should delete an item by id', function() {
+      let data;
+      return Tag.findOne({ userId: user.id })
+        .then(_data => {
+          data = _data;
+          return chai
+            .request(app)
+            .delete(`/api/tags/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
-        .then(res => {
+        .then(function(res) {
           expect(res).to.have.status(204);
+          expect(res.body).to.be.empty;
+          return Tag.findById(data.id);
         })
-        .then(() => {
-          return chai.request(app).get(`/api/notes/${id}`);
-        })
-        .then(res => {
-          expect(res).to.have.status(200);
-        });
-    });
-    /* NEGATIVE */
-    it('Fails to delete a tag from the database if it doesnt exist', function() {
-      return chai
-        .request(app)
-        .delete('/api/tags/25105215')
-        .then(res => {
-          expect(res).to.have.status(500);
-        })
-        .then(() => {
-          return chai.request(app).get('/api/tags/25105215');
-        })
-        .then(res => {
-          expect(res).to.have.status(400);
+        .then(item => {
+          expect(item).to.be.null;
         });
     });
   });

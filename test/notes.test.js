@@ -3,11 +3,14 @@ const chaiHttp = require('chai-http');
 const mongoose = require('mongoose');
 
 const app = require('../server');
-const { TEST_MONGODB_URI } = require('../config');
+const { TEST_MONGODB_URI, JWT_SECRET } = require('../config');
+const jwt = require('jsonwebtoken');
 
 const Note = require('../models/note');
+const User = require('../models/user');
+const Folder = require('../models/folders');
 
-const { notes, folders } = require('../db/seed/data.js');
+const { notes, folders, users, tags } = require('../db/seed/data.js');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
@@ -19,8 +22,19 @@ describe('Test each of the endpoints', () => {
       .then(() => mongoose.connection.db.dropDatabase());
   });
 
+  let token;
+  let user;
+
   beforeEach(function() {
-    return Note.insertMany(notes);
+    return Promise.all([
+      User.insertMany(users),
+      Note.insertMany(notes),
+      Folder.insertMany(folders),
+      Folder.createIndexes()
+    ]).then(([users]) => {
+      user = users[0];
+      token = jwt.sign({ user }, JWT_SECRET, { subject: user.username });
+    });
   });
 
   afterEach(function() {
@@ -37,7 +51,13 @@ describe('Test each of the endpoints', () => {
       // 1) Call the database **and** the API
       // 2) Wait for both promises to resolve using `Promise.all`
       return (
-        Promise.all([Note.find(), chai.request(app).get('/api/notes')])
+        Promise.all([
+          Note.find({ userId: user.id }),
+          chai
+            .request(app)
+            .get('/api/notes')
+            .set('Authorization', `Bearer ${token}`)
+        ])
           // 3) then compare database results to API response
           .then(([data, res]) => {
             expect(res).to.have.status(200);
@@ -53,7 +73,10 @@ describe('Test each of the endpoints', () => {
       return Note.findOne()
         .then(_data => {
           data = _data;
-          return chai.request(app).get(`/api/notes/${data.id}`);
+          return chai
+            .request(app)
+            .get(`/api/notes/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res).to.have.status(200);
@@ -66,7 +89,8 @@ describe('Test each of the endpoints', () => {
             'createdAt',
             'updatedAt',
             'folderId',
-            'tags'
+            'tags',
+            'userId'
           );
           expect(res.body.id).to.be.equal(data.id);
           expect(res.body.title).to.equal(data.title);
@@ -81,7 +105,8 @@ describe('Test each of the endpoints', () => {
       const dbPromise = Note.find({ title: { $regex: re } });
       const apiPromise = chai
         .request(app)
-        .get(`/api/notes?searchTerm=${searchTerm}`);
+        .get(`/api/notes?searchTerm=${searchTerm}`)
+        .set('Authorization', `Bearer ${token}`);
 
       return Promise.all([dbPromise, apiPromise]).then(([data, res]) => {
         expect(res).to.have.status(200);
@@ -93,6 +118,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .get('/api/notes/1245121')
+        .set('Authorization', `Bearer ${token}`)
         .then(res => {
           expect(res).to.have.status(400);
           expect(res).to.be.json;
@@ -116,6 +142,7 @@ describe('Test each of the endpoints', () => {
         chai
           .request(app)
           .post('/api/notes')
+          .set('Authorization', `Bearer ${token}`)
           .send(newItem)
           .then(function(_res) {
             res = _res;
@@ -129,7 +156,8 @@ describe('Test each of the endpoints', () => {
               'content',
               'createdAt',
               'updatedAt',
-              'tags'
+              'tags',
+              'userId'
             );
             // 2) then call the database
             return Note.findById(res.body.id);
@@ -155,6 +183,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .post('/api/notes')
+        .set('Authorization', `Bearer ${token}`)
         .send(newItem)
         .then(function(_res) {
           res = _res;
@@ -175,18 +204,30 @@ describe('Test each of the endpoints', () => {
           return chai
             .request(app)
             .put(`/api/notes/${data.id}`)
+            .set('Authorization', `Bearer ${token}`)
             .send(updateItem);
         })
         .then(res => {
           expect(res).to.have.status(200);
           expect(res).to.be.json;
           expect(res.body).to.be.an('object');
-          expect(res.body).to.have.keys('id', 'title', 'content');
+          expect(res.body).to.have.keys(
+            'id',
+            'title',
+            'content',
+            'createdAt',
+            'folderId',
+            'tags',
+            'updatedAt',
+            'userId'
+          );
           return res.body.id;
         })
         .then(id => {
-          console.log(`ID IS ${id}`);
-          return chai.request(app).get(`/api/notes/${id}`);
+          return chai
+            .request(app)
+            .get(`/api/notes/${id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res.body.title).to.equal(updateItem.title);
@@ -201,6 +242,7 @@ describe('Test each of the endpoints', () => {
           return chai
             .request(app)
             .put(`/api/notes/${data.id}`)
+            .set('Authorization', `Bearer ${token}`)
             .send(updateItem);
         })
         .then(res => {
@@ -215,19 +257,22 @@ describe('Test each of the endpoints', () => {
   describe('DELETE request testing', function() {
     it('Successfully deletes item from DB', function() {
       let id;
-      return Note.findOne()
+      return Note.findOne({ userId: user.id })
         .then(data => {
           id = data.id;
-          return chai.request(app).delete(`/api/notes/${data.id}`);
+          return chai
+            .request(app)
+            .delete(`/api/notes/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res).to.have.status(204);
         })
         .then(() => {
-          return chai.request(app).get(`/api/notes/${id}`);
+          return Note.findById(id);
         })
-        .then(res => {
-          expect(res).to.have.status(200);
+        .then(item => {
+          expect(item).to.be.null;
         });
     });
 
@@ -235,11 +280,15 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .delete('/api/notes/124542632')
+        .set('Authorization', `Bearer ${token}`)
         .then(res => {
           expect(res).to.have.status(500);
         })
         .then(() => {
-          return chai.request(app).get('/api/notes/124542632');
+          return chai
+            .request(app)
+            .get('/api/notes/124542632')
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res).to.have.status(400);

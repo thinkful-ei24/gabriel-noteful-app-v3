@@ -3,12 +3,13 @@ const chaiHttp = require('chai-http');
 const mongoose = require('mongoose');
 
 const app = require('../server');
-const { TEST_MONGODB_URI } = require('../config');
+const { TEST_MONGODB_URI, JWT_SECRET } = require('../config');
+const jwt = require('jsonwebtoken');
 
-const Note = require('../models/note');
+const User = require('../models/user');
 const Folder = require('../models/folders');
 
-const { notes, folders } = require('../db/seed/data.js');
+const { notes, folders, users, tags } = require('../db/seed/data.js');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
@@ -20,8 +21,18 @@ describe('Test each of the endpoints', () => {
       .then(() => mongoose.connection.db.dropDatabase());
   });
 
+  let token;
+  let user;
+
   beforeEach(function() {
-    return Folder.insertMany(folders);
+    return Promise.all([
+      User.insertMany(users),
+      Folder.insertMany(folders),
+      Folder.createIndexes()
+    ]).then(([users]) => {
+      user = users[0];
+      token = jwt.sign({ user }, JWT_SECRET, { subject: user.username });
+    });
   });
 
   afterEach(function() {
@@ -49,6 +60,47 @@ describe('Test each of the endpoints', () => {
     });
   });
 
+  describe('GET /api/folders', function() {
+    it('should return the correct number of folders', function() {
+      const dbPromise = Folder.find({ userId: user.id });
+      const apiPromise = chai
+        .request(app)
+        .get('/api/folders')
+        .set('Authorization', `Bearer ${token}`); // <<== Add this
+
+      return Promise.all([dbPromise, apiPromise]).then(([data, res]) => {
+        expect(res).to.have.status(200);
+        expect(res).to.be.json;
+        expect(res.body).to.be.a('array');
+        expect(res.body).to.have.length(data.length);
+      });
+    });
+  });
+
+  it('should return a list with the correct right fields', function() {
+    const dbPromise = Folder.find({ userId: user.id }); // <<== Add filter on User Id
+    const apiPromise = chai
+      .request(app)
+      .get('/api/folders')
+      .set('Authorization', `Bearer ${token}`); // <<== Add Authorization header
+
+    return Promise.all([dbPromise, apiPromise]).then(([data, res]) => {
+      expect(res).to.have.status(200);
+      expect(res).to.be.json;
+      expect(res.body).to.be.a('array');
+      res.body.forEach(function(item) {
+        expect(item).to.be.a('object');
+        expect(item).to.have.keys(
+          'id',
+          'name',
+          'userId',
+          'createdAt',
+          'updatedAt'
+        ); // <<== Update assertion
+      });
+    });
+  });
+
   /* GET by ID */
   describe('GET folder by ID', function() {
     // Positive
@@ -58,14 +110,23 @@ describe('Test each of the endpoints', () => {
         .select('id name')
         .then(_data => {
           data = _data;
-          return chai.request(app).get(`/api/folders/${data.id}`);
+          return chai
+            .request(app)
+            .get(`/api/folders/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(res => {
           expect(res).to.have.status(200);
           expect(res).to.be.json;
 
           expect(res.body).to.be.an('object');
-          expect(res.body).to.have.keys('id', 'name', 'createdAt', 'updatedAt');
+          expect(res.body).to.have.keys(
+            'id',
+            'name',
+            'createdAt',
+            'updatedAt',
+            'userId'
+          );
 
           expect(res.body.id).to.equal(data.id);
           expect(res.body.name).to.equal(data.name);
@@ -76,6 +137,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .get('/api/folders/21592521512')
+        .set('Authorization', `Bearer ${token}`)
         .then(res => {
           expect(res).to.have.status(400);
           expect(res).to.be.json;
@@ -94,6 +156,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .post('/api/folders')
+        .set('Authorization', `Bearer ${token}`)
         .send(newFolder)
         .then(function(_res) {
           res = _res;
@@ -101,7 +164,13 @@ describe('Test each of the endpoints', () => {
           expect(res).to.have.header('location');
           expect(res).to.be.json;
           expect(res.body).to.be.an('object');
-          expect(res.body).to.have.keys('name', 'createdAt', 'updatedAt', 'id');
+          expect(res.body).to.have.keys(
+            'name',
+            'createdAt',
+            'updatedAt',
+            'id',
+            'userId'
+          );
 
           return Folder.findById(res.body.id);
         })
@@ -120,6 +189,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .post('/api/folders')
+        .set('Authorization', `Bearer ${token}`)
         .send(newFolder)
         .then(function(_res) {
           res = _res;
@@ -145,6 +215,7 @@ describe('Test each of the endpoints', () => {
           return chai
             .request(app)
             .put(`/api/folders/${data.id}`)
+            .set('Authorization', `Bearer ${token}`)
             .send(updateFolder);
         })
         .then(res => {
@@ -163,6 +234,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .put(`/api/folders/${badId}`)
+        .set('Authorization', `Bearer ${token}`)
         .send(updateItem)
         .catch(err => err.response)
         .then(res => {
@@ -181,7 +253,10 @@ describe('Test each of the endpoints', () => {
         .select('id name')
         .then(_data => {
           data = _data;
-          return chai.request(app).delete(`/api/folders/${data.id}`);
+          return chai
+            .request(app)
+            .delete(`/api/folders/${data.id}`)
+            .set('Authorization', `Bearer ${token}`);
         })
         .then(function(res) {
           expect(res).to.have.status(204);
@@ -192,6 +267,7 @@ describe('Test each of the endpoints', () => {
       return chai
         .request(app)
         .delete('/api/folders/51251251295812519')
+        .set('Authorization', `Bearer ${token}`)
         .catch(err => err.response)
         .then(res => {
           expect(res).to.have.status(500);
